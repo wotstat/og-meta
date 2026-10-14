@@ -1,6 +1,6 @@
 {
   "name": "analytics-frontend-meta",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "devDependencies": {
     "@types/bun": "latest",
     "@typescript-eslint/parser": "^8.71.1",
@@ -9,8 +9,8 @@
   },
   "private": true,
   "scripts": {
-    "lint": "eslint . --max-warnings=0",
-    "lint:fix": "eslint . --fix"
+    "start": "bun run src/index.ts",
+    "dev": "docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up --build"
   },
   "type": "module"
 }
