@@ -2,6 +2,9 @@ import type { Artifact } from './artifact'
 import { imagePath, imageUrl, renderHtml } from './metadata'
 import { RendererError, type RendererPool } from './renderer/RendererPool'
 
+// Временно включаем метаданные только для */debug/* на время проверки миграции.
+const isDebugPage = (page: URL) => page.pathname.includes('/debug/')
+
 export function startServer(artifact: Artifact, pool: RendererPool, timeoutMs: number) {
   const publicOrigin = new URL(Bun.env.PUBLIC_ORIGIN ?? 'https://wotstat.info').origin
   const { metadata, version } = artifact
@@ -39,6 +42,12 @@ export function startServer(artifact: Artifact, pool: RendererPool, timeoutMs: n
     const page = pageUrl(url.pathname + url.search, publicOrigin)
     if (!page) return failure('Invalid page URL', 400)
 
+    if (!isDebugPage(page)) {
+      return new Response(request.method === 'HEAD' ? null : artifact.html, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' },
+      })
+    }
+
     const meta = metadata.resolveMeta(page)
     return new Response(request.method === 'HEAD' ? null : renderHtml(artifact, page, meta, requestImageOrigin(request)), {
       headers: {
@@ -57,6 +66,7 @@ export function startServer(artifact: Artifact, pool: RendererPool, timeoutMs: n
 
     const page = pageUrl(raw, publicOrigin)
     if (!page) return failure('Invalid page URL', 400)
+    if (!isDebugPage(page)) return failure('Not found', 404)
 
     const requestedVersion = params.get('v')
     if (requestedVersion && requestedVersion !== version) {

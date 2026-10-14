@@ -14,3 +14,7 @@ bun run dev    # dev с логами в терминале
 После пересборки фронтенда повторно запусти соответствующий `rerun`-скрипт.
 
 Статику из `dist/` раздаёт Nginx, HTML и OG — Bun. Картинки: `og.wotstat.info/analytics/image.png`. Конфиги Nginx — в [server-config](../server-config/etc/nginx/).
+
+CI по push в `main` или вручную копирует проект на сервер и запускает `rerun.sh`. Нужны variable `APP_PATH` = `/app/wotstat/og-meta` и secrets `SSH_HOST`, `SSH_USER`, `SSH_KEY`.
+
+На время миграции метатеги и PNG включены только для `*/debug/*`. Остальные страницы получают исходный HTML без изменений, а запросы их PNG — 404.

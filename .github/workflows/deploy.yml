@@ -1,0 +1,44 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/production.key
+          chmod 600 ~/.ssh/production.key
+          cat >>~/.ssh/config <<END
+          Host node
+            HostName $SSH_HOST
+            User $SSH_USER
+            IdentityFile ~/.ssh/production.key
+            StrictHostKeyChecking no
+          END
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+
+      - name: Copy to server
+        run: |
+          ssh node "mkdir -p '${{ vars.APP_PATH }}'"
+          rsync -avz --exclude=.git/ ./ "node:${{ vars.APP_PATH }}/"
+
+      - name: Run deploy script
+        run: ssh node "cd '${{ vars.APP_PATH }}' && bash rerun.sh"
