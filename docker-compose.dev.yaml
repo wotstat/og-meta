@@ -1,6 +1,6 @@
 services:
-  meta:
-    command: ['bun', '--watch', 'src/index.ts']
+  og-meta:
+    command: [ 'bun', '--watch', 'src/index.ts' ]
     restart: 'no'
     environment:
       PUBLIC_ORIGIN: http://localhost:9110

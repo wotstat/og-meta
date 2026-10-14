@@ -1,5 +1,5 @@
 services:
-  meta:
+  og-meta:
     build: .
     init: true
     restart: unless-stopped
