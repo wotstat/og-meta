@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { database } from './database'
@@ -17,6 +16,7 @@ export type PageMeta = {
 
 export type MetaResolver = {
   resolveMeta: (url: URL) => Promise<PageMeta>
+  warmup: () => Promise<void>
   close: () => void
 }
 
@@ -31,15 +31,17 @@ export async function loadArtifact(directory: string) {
   const htmlPath = join(directory, 'spa.html')
   const clientDir = join(directory, 'client')
 
+  const release: { schema: number, id: string } = await Bun.file(join(directory, 'release.json')).json()
+  if (release.schema !== 1 || typeof release.id !== 'string' || !/^[a-f0-9]{24}$/.test(release.id)) {
+    throw new Error('Invalid frontend release manifest')
+  }
+  if (Bun.env.RELEASE_ID && Bun.env.RELEASE_ID !== release.id) {
+    throw new Error('Frontend release differs from the deployed release ID')
+  }
+
   const metadata: MetaModule = await import(pathToFileURL(modulePath).href)
   const html = await Bun.file(htmlPath).text()
-
-  // index.html содержит хешированные пути JS/CSS и учитывает изменения карточек.
-  const version = createHash('sha256')
-    .update(await Bun.file(modulePath).text())
-    .update(await Bun.file(join(clientDir, 'index.html')).text())
-    .digest('hex').slice(0, 16)
-  return { metadata, html, clientDir, version }
+  return { metadata, html, clientDir, version: release.id }
 }
 
 export type Artifact = Awaited<ReturnType<typeof loadArtifact>>

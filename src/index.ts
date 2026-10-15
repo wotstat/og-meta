@@ -19,21 +19,34 @@ const pool = new RendererPool({
   noSandbox: Bun.env.CHROME_NO_SANDBOX === 'true',
 })
 
-const server = startServer(artifact, resolver, pool, timeoutMs)
+let ready = false
+let stopping = false
+const server = startServer(artifact, resolver, pool, timeoutMs, () => ready && !stopping)
 
 console.log(`Meta server: ${server.url} (version ${artifact.version})`)
-pool.warmup().then(
-  () => console.log('Chromium pool ready'),
-  error => console.error('Chromium warmup failed; HTML remains available:', error),
+Promise.all([pool.warmup(), resolver.warmup()]).then(
+  () => {
+    ready = true
+    console.log('Contexts and Chromium pool ready')
+  },
+  error => console.error('Meta warmup failed; HTML remains available:', error),
 )
 
-let stopping = false
 const stop = async () => {
   if (stopping) return
   stopping = true
+  const deadline = setTimeout(() => {
+    console.error('Graceful shutdown timed out')
+    resolver.close()
+    pool.close()
+    void server.stop(true)
+    Bun.WebView.closeAll()
+    process.exit(1)
+  }, 30_000)
+  await server.stop()
+  clearTimeout(deadline)
   resolver.close()
   pool.close()
-  await server.stop(true)
   Bun.WebView.closeAll()
   process.exit(0)
 }

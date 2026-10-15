@@ -4,3 +4,7 @@ node_modules
 README.md
 *.log
 .DS_Store
+runtime
+versions
+current
+deploy

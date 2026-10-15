@@ -2,10 +2,10 @@ import type { Artifact, MetaResolver } from './artifact'
 import { imagePath, imageUrl, renderHtml } from './metadata'
 import { RendererError, type RendererPool } from './renderer/RendererPool'
 
-// Временно включаем метаданные только для */debug/* на время проверки миграции.
+// Временно включаем метаданные только для */debug/* на время отладки.
 const isDebugPage = (page: URL) => page.pathname.includes('/debug/')
 
-export function startServer(artifact: Artifact, resolver: MetaResolver, pool: RendererPool, timeoutMs: number) {
+export function startServer(artifact: Artifact, resolver: MetaResolver, pool: RendererPool, timeoutMs: number, isReady: () => boolean) {
   const publicOrigin = new URL(Bun.env.PUBLIC_ORIGIN ?? 'https://wotstat.info').origin
   const { version } = artifact
 
@@ -15,7 +15,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
     idleTimeout: Math.ceil(timeoutMs / 1000) + 5,
     routes: {
       '/health': { GET: () => health(200) },
-      '/ready': { GET: () => health(pool.ready ? 200 : 503) },
+      '/ready': { GET: () => health(isReady() && pool.ready ? 200 : 503) },
       [imagePath]: { GET: image },
       '/*': { GET: html },
     },
@@ -31,7 +31,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
   })
 
   function health(status: number) {
-    return Response.json({ version, rendererReady: pool.ready }, {
+    return Response.json({ version, deploymentId: Bun.env.DEPLOYMENT_ID, rendererReady: pool.ready }, {
       status,
       headers: { 'Cache-Control': 'no-store' },
     })
@@ -52,7 +52,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
     return new Response(request.method === 'HEAD' ? null : renderHtml(artifact, page, meta, requestImageOrigin(request)), {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': `public, max-age=${meta.cache.htmlSeconds}`,
+        'Cache-Control': `public, max-age=${Math.min(300, Math.max(0, meta.cache.htmlSeconds))}`,
         Vary: 'X-Forwarded-Host',
       },
     })

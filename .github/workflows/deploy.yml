@@ -36,9 +36,19 @@ jobs:
           SSH_HOST: ${{ secrets.SSH_HOST }}
 
       - name: Copy to server
+        env:
+          APP_PATH: ${{ vars.APP_PATH }}
         run: |
-          ssh node "mkdir -p '${{ vars.APP_PATH }}'"
-          rsync -avz --exclude=.git/ ./ "node:${{ vars.APP_PATH }}/"
+          source_path="$APP_PATH/versions/$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf -v command '%q ' mkdir -p "$source_path"
+          ssh node "$command"
+          rsync -avz --protect-args --exclude=.git/ --exclude=node_modules/ --exclude='.env*' \
+            --exclude=runtime/ --exclude=versions/ --exclude=current ./ "node:$source_path/"
+          echo "DEPLOY_SOURCE=$source_path" >> "$GITHUB_ENV"
 
       - name: Run deploy script
-        run: ssh node "cd '${{ vars.APP_PATH }}' && bash rerun.sh"
+        env:
+          APP_PATH: ${{ vars.APP_PATH }}
+        run: |
+          printf -v command '%q ' sh "$DEPLOY_SOURCE/rerun.sh" meta --app-dir "$APP_PATH"
+          ssh node "$command"

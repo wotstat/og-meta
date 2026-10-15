@@ -1,17 +1,19 @@
+# Standalone development stack; production blue-green state is not used.
 services:
   og-meta:
-    command: [ 'bun', '--watch', 'src/index.ts' ]
-    restart: 'no'
+    build: .
+    init: true
+    command: ['bun', '--watch', 'src/index.ts']
+    ports: ['127.0.0.1:9110:3000']
     environment:
       PUBLIC_ORIGIN: http://localhost:9110
       IMAGE_ORIGIN: http://localhost:9110
+      CHROME_NO_SANDBOX: 'true'
       CLICKHOUSE_PROXY_URL: https://wotstat.info/api/db/
       CLICKHOUSE_USER: public
       CLICKHOUSE_PASSWORD: ''
     volumes:
-      - type: bind
-        source: ./src
-        target: /app/src
-        read_only: true
-        bind:
-          create_host_path: false
+      - ../analytics-frontend/dist-meta:/meta:ro
+      - ./src:/app/src:ro
+    shm_size: 256mb
+    stop_grace_period: 40s

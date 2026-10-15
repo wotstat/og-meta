@@ -1,40 +1,75 @@
+x-meta: &meta
+  init: true
+  restart: always
+  extra_hosts:
+    - 'host.docker.internal:host-gateway'
+  networks: [og-meta]
+  shm_size: 256mb
+  stop_grace_period: 40s
+  healthcheck:
+    test: ['CMD', 'bun', '-e', 'const r = await fetch("http://127.0.0.1:3000/ready"); process.exit(r.ok ? 0 : 1)']
+    interval: 30s
+    timeout: 5s
+    start_period: 30s
+    retries: 3
+
+x-environment: &environment
+  PUBLIC_ORIGIN: https://wotstat.info
+  IMAGE_ORIGIN: https://og.wotstat.info
+  RENDER_POOL_SIZE: '2'
+  RENDER_QUEUE_LIMIT: '20'
+  RENDER_TIMEOUT_MS: '15000'
+  CHROME_NO_SANDBOX: 'true'
+  CLICKHOUSE_PROXY_URL: http://host.docker.internal:8124/
+  CLICKHOUSE_USER: internal-public
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+
 services:
-  og-meta:
-    build: .
-    init: true
-    restart: unless-stopped
+  gateway:
+    image: nginx:1.30-alpine
+    restart: always
+    command: ['nginx', '-c', '/etc/og-gateway/nginx.conf', '-g', 'daemon off;']
     ports:
       - '127.0.0.1:9110:3000'
-    environment:
-      PUBLIC_ORIGIN: https://wotstat.info
-      IMAGE_ORIGIN: https://og.wotstat.info
-      RENDER_POOL_SIZE: '2'
-      RENDER_QUEUE_LIMIT: '20'
-      RENDER_TIMEOUT_MS: '15000'
-      CHROME_NO_SANDBOX: 'true'
-      CLICKHOUSE_PROXY_URL: http://host.docker.internal:8124/
-      CLICKHOUSE_USER: internal-public
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    networks:
-      - og-meta
     volumes:
       - type: bind
-        source: ../analytics-frontend/dist-meta
+        source: ./runtime/nginx
+        target: /etc/og-gateway
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [og-meta]
+    stop_grace_period: 40s
+
+  meta-blue:
+    <<: *meta
+    image: ${META_BLUE_IMAGE:?Run rerun.sh}
+    environment:
+      <<: *environment
+      RELEASE_ID: ${META_BLUE_RELEASE}
+      DEPLOYMENT_ID: ${META_BLUE_DEPLOYMENT}
+    volumes:
+      - type: bind
+        source: ${META_BLUE_ARTIFACT_DIR}
         target: /meta
         read_only: true
         bind:
           create_host_path: false
-    shm_size: 256mb
 
-    healthcheck:
-      test: [ 'CMD', 'bun', '-e', 'const r = await fetch("http://127.0.0.1:3000/ready"); process.exit(r.ok ? 0 : 1)' ]
-      interval: 30s
-      timeout: 5s
-      start_period: 30s
-      retries: 3
-    stop_grace_period: 20s
+  meta-green:
+    <<: *meta
+    image: ${META_GREEN_IMAGE:?Run rerun.sh}
+    environment:
+      <<: *environment
+      RELEASE_ID: ${META_GREEN_RELEASE}
+      DEPLOYMENT_ID: ${META_GREEN_DEPLOYMENT}
+    volumes:
+      - type: bind
+        source: ${META_GREEN_ARTIFACT_DIR}
+        target: /meta
+        read_only: true
+        bind:
+          create_host_path: false
 
 networks:
   og-meta:
