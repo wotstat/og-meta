@@ -5,6 +5,9 @@ services:
     environment:
       PUBLIC_ORIGIN: http://localhost:9110
       IMAGE_ORIGIN: http://localhost:9110
+      CLICKHOUSE_PROXY_URL: https://wotstat.info/api/db/
+      CLICKHOUSE_USER: public
+      CLICKHOUSE_PASSWORD: ''
     volumes:
       - type: bind
         source: ./src
