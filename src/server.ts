@@ -1,13 +1,13 @@
-import type { Artifact } from './artifact'
+import type { Artifact, MetaResolver } from './artifact'
 import { imagePath, imageUrl, renderHtml } from './metadata'
 import { RendererError, type RendererPool } from './renderer/RendererPool'
 
 // Временно включаем метаданные только для */debug/* на время проверки миграции.
 const isDebugPage = (page: URL) => page.pathname.includes('/debug/')
 
-export function startServer(artifact: Artifact, pool: RendererPool, timeoutMs: number) {
+export function startServer(artifact: Artifact, resolver: MetaResolver, pool: RendererPool, timeoutMs: number) {
   const publicOrigin = new URL(Bun.env.PUBLIC_ORIGIN ?? 'https://wotstat.info').origin
-  const { metadata, version } = artifact
+  const { version } = artifact
 
   return Bun.serve({
     hostname: Bun.env.HOST ?? '127.0.0.1',
@@ -37,7 +37,7 @@ export function startServer(artifact: Artifact, pool: RendererPool, timeoutMs: n
     })
   }
 
-  function html(request: Request) {
+  async function html(request: Request) {
     const url = new URL(request.url)
     const page = pageUrl(url.pathname + url.search, publicOrigin)
     if (!page) return failure('Invalid page URL', 400)
@@ -48,7 +48,7 @@ export function startServer(artifact: Artifact, pool: RendererPool, timeoutMs: n
       })
     }
 
-    const meta = metadata.resolveMeta(page)
+    const meta = await resolver.resolveMeta(page)
     return new Response(request.method === 'HEAD' ? null : renderHtml(artifact, page, meta, requestImageOrigin(request)), {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
@@ -79,7 +79,7 @@ export function startServer(artifact: Artifact, pool: RendererPool, timeoutMs: n
       })
     }
 
-    const meta = metadata.resolveMeta(page)
+    const meta = await resolver.resolveMeta(page)
     if (!meta.hasImage) return failure('No image for this page', 404)
     const headers = {
       'Content-Type': 'image/png',
@@ -88,7 +88,7 @@ export function startServer(artifact: Artifact, pool: RendererPool, timeoutMs: n
     if (request.method === 'HEAD') return new Response(null, { headers })
 
     try {
-      return new Response(await pool.render({ url: page.href, format }), { headers })
+      return new Response(await pool.render({ url: page.href, format, meta }), { headers })
     } catch (error) {
       console.error('Meta image rendering failed:', error)
       const status = error instanceof RendererError ? error.status : 502

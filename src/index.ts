@@ -1,9 +1,11 @@
 import { loadArtifact } from './artifact'
 import { startServer } from './server'
 import { RendererPool } from './renderer/RendererPool'
+import { database } from './database'
 
 const timeoutMs = Number(Bun.env.RENDER_TIMEOUT_MS ?? 15000)
 const artifact = await loadArtifact(Bun.env.META_ARTIFACT_DIR ?? '../analytics-frontend/dist-meta')
+const resolver = artifact.metadata.createServerMetaResolver(database)
 
 const pool = new RendererPool({
   clientDir: artifact.clientDir,
@@ -15,7 +17,7 @@ const pool = new RendererPool({
   noSandbox: Bun.env.CHROME_NO_SANDBOX === 'true',
 })
 
-const server = startServer(artifact, pool, timeoutMs)
+const server = startServer(artifact, resolver, pool, timeoutMs)
 
 console.log(`Meta server: ${server.url} (version ${artifact.version})`)
 pool.warmup().then(
@@ -27,6 +29,7 @@ let stopping = false
 const stop = async () => {
   if (stopping) return
   stopping = true
+  resolver.close()
   pool.close()
   await server.stop(true)
   Bun.WebView.closeAll()

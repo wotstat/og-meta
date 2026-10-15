@@ -1,9 +1,8 @@
 import { resolve } from 'node:path'
+import { database } from '../database'
 
-const databaseUrl = new URL(Bun.env.CLICKHOUSE_PROXY_URL ?? 'https://wotstat.info/api/db/')
-const databaseUser = Bun.env.CLICKHOUSE_USER ?? 'public'
-const databasePassword = Bun.env.CLICKHOUSE_PASSWORD ?? ''
-const authorization = `Basic ${Buffer.from(`${databaseUser}:${databasePassword}`).toString('base64')}`
+const databaseUrl = new URL(database.url)
+const authorization = `Basic ${Buffer.from(`${database.username}:${database.password}`).toString('base64')}`
 
 // Meta SPA доступен локально, отдельно от публичного HTTP сайта.
 export function startRenderServer(directory: string) {

@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import type { database } from './database'
 
 // Контракт собранного server.mjs; исходники и Vue-зависимости сайта здесь не нужны.
 export type ImageFormat = 'og' | 'twitter'
 
 export type PageMeta = {
+  definitionId: string
   hasImage: boolean
   title: string
   description?: string
@@ -13,9 +15,14 @@ export type PageMeta = {
   cache: { htmlSeconds: number, imageSeconds: number }
 }
 
+export type MetaResolver = {
+  resolveMeta: (url: URL) => Promise<PageMeta>
+  close: () => void
+}
+
 type MetaModule = {
   formats: Record<ImageFormat, { width: number, height: number }>
-  resolveMeta: (url: URL) => PageMeta
+  createServerMetaResolver: (options: typeof database) => MetaResolver
 }
 
 export async function loadArtifact(directory: string) {

@@ -1,4 +1,4 @@
-import type { Artifact, ImageFormat } from '../artifact'
+import type { Artifact, ImageFormat, PageMeta } from '../artifact'
 import { startRenderServer } from './server'
 
 type RendererPoolOptions = {
@@ -11,7 +11,7 @@ type RendererPoolOptions = {
   noSandbox?: boolean
 }
 
-type RenderRequest = { url: string, format: ImageFormat }
+type RenderRequest = { url: string, format: ImageFormat, meta: PageMeta }
 
 export class RendererError extends Error {
   constructor(message: string, readonly status: 502 | 503 | 504, options?: ErrorOptions) {
