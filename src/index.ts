@@ -5,7 +5,9 @@ import { database } from './database'
 
 const timeoutMs = Number(Bun.env.RENDER_TIMEOUT_MS ?? 15000)
 const artifact = await loadArtifact(Bun.env.META_ARTIFACT_DIR ?? '../analytics-frontend/dist-meta')
-const resolver = artifact.metadata.createServerMetaResolver(database)
+const { createDatabase, createMetaResolver } = artifact.metadata
+const { query } = createDatabase(database)
+const resolver = createMetaResolver(query)
 
 const pool = new RendererPool({
   clientDir: artifact.clientDir,

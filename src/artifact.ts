@@ -22,7 +22,8 @@ export type MetaResolver = {
 
 type MetaModule = {
   formats: Record<ImageFormat, { width: number, height: number }>
-  createServerMetaResolver: (options: typeof database) => MetaResolver
+  createDatabase: (options: typeof database) => { query: unknown }
+  createMetaResolver: (query: unknown) => MetaResolver
 }
 
 export async function loadArtifact(directory: string) {
