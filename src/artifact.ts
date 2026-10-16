@@ -11,6 +11,7 @@ export type PageMeta = {
   title: string
   description?: string
   imageAlt?: string
+  revisionKey?: string
   cache: { htmlSeconds: number, imageSeconds: number }
 }
 

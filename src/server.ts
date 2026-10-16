@@ -73,7 +73,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
       return new Response(null, {
         status: 302,
         headers: {
-          Location: imageUrl(page, format, version, requestImageOrigin(request)),
+          Location: imageUrl(page, format, version, requestImageOrigin(request), params.get('r') ?? undefined),
           'Cache-Control': 'no-store'
         },
       })

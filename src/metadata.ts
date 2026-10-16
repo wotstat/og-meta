@@ -2,11 +2,12 @@ import type { Artifact, PageMeta, ImageFormat } from './artifact'
 
 export const imagePath = '/analytics/image.png'
 
-export function imageUrl(page: URL, format: ImageFormat, version: string, origin: string): string {
+export function imageUrl(page: URL, format: ImageFormat, version: string, origin: string, revisionKey?: string): string {
   const url = new URL(imagePath, origin)
   url.searchParams.set('url', page.pathname + page.search)
   url.searchParams.set('format', format)
   url.searchParams.set('v', version)
+  if (revisionKey !== undefined) url.searchParams.set('r', revisionKey)
   return url.href
 }
 
@@ -30,11 +31,11 @@ export function renderHtml(artifact: Artifact, page: URL, meta: PageMeta, imageO
   }
 
   if (meta.hasImage) {
-    properties['og:image'] = imageUrl(page, 'og', version, imageOrigin)
+    properties['og:image'] = imageUrl(page, 'og', version, imageOrigin, meta.revisionKey)
     properties['og:image:type'] = 'image/png'
     properties['og:image:width'] = String(metadata.formats.og.width)
     properties['og:image:height'] = String(metadata.formats.og.height)
-    names['twitter:image'] = imageUrl(page, 'twitter', version, imageOrigin)
+    names['twitter:image'] = imageUrl(page, 'twitter', version, imageOrigin, meta.revisionKey)
 
     if (meta.imageAlt !== undefined) {
       properties['og:image:alt'] = meta.imageAlt
