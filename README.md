@@ -1,7 +1,7 @@
 # analytics-frontend-meta
 
 Метатеги и PNG/JPEG-превью для WotStat. Bun + Chromium в Docker.
-Пока включены только для `*/debug/*`.
+Метатеги формируются для всех страниц, превью — для страниц с поддержкой изображений.
 
 Оба endpoint доступны всегда: `/analytics/image.png` возвращает PNG,
 `/analytics/image.jpg` — JPEG. Метатеги HTML выбирают ссылку по `IMAGE_FORMAT`
