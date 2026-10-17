@@ -3,11 +3,11 @@ x-meta: &meta
   restart: always
   extra_hosts:
     - 'host.docker.internal:host-gateway'
-  networks: [og-meta]
+  networks: [ og-meta ]
   shm_size: 256mb
   stop_grace_period: 40s
   healthcheck:
-    test: ['CMD', 'bun', '-e', 'const r = await fetch("http://127.0.0.1:3000/ready"); process.exit(r.ok ? 0 : 1)']
+    test: [ 'CMD', 'bun', '-e', 'const r = await fetch("http://127.0.0.1:3000/ready"); process.exit(r.ok ? 0 : 1)' ]
     interval: 30s
     timeout: 5s
     start_period: 30s
@@ -16,7 +16,9 @@ x-meta: &meta
 x-environment: &environment
   PUBLIC_ORIGIN: https://wotstat.info
   IMAGE_ORIGIN: https://og.wotstat.info
-  RENDER_POOL_SIZE: '2'
+  IMAGE_FORMAT: jpeg
+  IMAGE_QUALITY: '98'
+  RENDER_POOL_SIZE: '4'
   RENDER_QUEUE_LIMIT: '20'
   RENDER_TIMEOUT_MS: '15000'
   CHROME_NO_SANDBOX: 'true'
@@ -28,7 +30,7 @@ services:
   gateway:
     image: nginx:1.30-alpine
     restart: always
-    command: ['nginx', '-c', '/etc/og-gateway/nginx.conf', '-g', 'daemon off;']
+    command: [ 'nginx', '-c', '/etc/og-gateway/nginx.conf', '-g', 'daemon off;' ]
     ports:
       - '127.0.0.1:9110:3000'
     volumes:
@@ -38,7 +40,7 @@ services:
         read_only: true
         bind:
           create_host_path: false
-    networks: [og-meta]
+    networks: [ og-meta ]
     stop_grace_period: 40s
 
   meta-blue:

@@ -1,5 +1,6 @@
 import type { Artifact, MetaResolver } from './artifact'
-import { imagePath, imageUrl, renderHtml } from './metadata'
+import { imageEncodings, type ImageEncoding } from './image'
+import { imageUrl, renderHtml } from './metadata'
 import { RendererError, type RendererPool } from './renderer/RendererPool'
 
 // Временно включаем метаданные только для */debug/* на время отладки.
@@ -16,7 +17,8 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
     routes: {
       '/health': { GET: () => health(200) },
       '/ready': { GET: () => health(isReady() && pool.ready ? 200 : 503) },
-      [imagePath]: { GET: image },
+      [imageEncodings.png.path]: { GET: request => image(request, 'png') },
+      [imageEncodings.jpeg.path]: { GET: request => image(request, 'jpeg') },
       '/*': { GET: html },
     },
     fetch: () => {
@@ -58,7 +60,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
     })
   }
 
-  async function image(request: Request) {
+  async function image(request: Request, encoding: ImageEncoding) {
     const params = new URL(request.url).searchParams
     const raw = params.get('url')
     const format = params.get('format') ?? 'og'
@@ -73,7 +75,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
       return new Response(null, {
         status: 302,
         headers: {
-          Location: imageUrl(page, format, version, requestImageOrigin(request), params.get('r') ?? undefined),
+          Location: imageUrl(page, format, encoding, version, requestImageOrigin(request), params.get('r') ?? undefined),
           'Cache-Control': 'no-store'
         },
       })
@@ -82,13 +84,13 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
     const meta = await resolver.resolveMeta(page)
     if (!meta.hasImage) return failure('No image for this page', 404)
     const headers = {
-      'Content-Type': 'image/png',
+      'Content-Type': imageEncodings[encoding].contentType,
       'Cache-Control': `public, max-age=${meta.cache.imageSeconds}`,
     }
     if (request.method === 'HEAD') return new Response(null, { headers })
 
     try {
-      return new Response(await pool.render({ url: page.href, format, meta }), { headers })
+      return new Response(await pool.render({ url: page.href, format, encoding, meta }), { headers })
     } catch (error) {
       console.error('Meta image rendering failed:', error)
       const status = error instanceof RendererError ? error.status : 502

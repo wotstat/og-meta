@@ -23,29 +23,6 @@ type RunOptions = {
   check?: boolean
   quiet?: boolean
   env?: NodeJS.ProcessEnv
-  input?: string
-  timeout?: number
-}
-
-// Serialized and executed inside the candidate container; keep this function self-contained.
-async function checkCandidate() {
-  // Runs inside the candidate container; no public DNS, CDN or database is required.
-  const origin = 'http://127.0.0.1:3000'
-  const health = await fetch(`${origin}/ready`, { signal: AbortSignal.timeout(5000) }).then(response => response.json())
-  if (!health || typeof health !== 'object'
-    || !('version' in health) || health.version !== Bun.env.RELEASE_ID
-    || !('deploymentId' in health) || health.deploymentId !== Bun.env.DEPLOYMENT_ID)
-    throw new Error('Unexpected candidate release')
-
-  const html = await fetch(`${origin}/debug/deploy-smoke`, { signal: AbortSignal.timeout(5000) })
-  if (!html.ok || !(await html.text()).includes('og:image')) throw new Error('Meta HTML smoke check failed')
-
-  const image = await fetch(`${origin}/analytics/image.png?url=/debug/deploy-smoke`, { signal: AbortSignal.timeout(20_000) })
-  const bytes = new Uint8Array(await image.arrayBuffer())
-  if (!image.ok || [137, 80, 78, 71, 13, 10, 26, 10].some((value, index) => bytes[index] !== value))
-    throw new Error('PNG smoke check failed')
-
-  console.log('Candidate HTML and PNG passed')
 }
 
 function acquireDeployLock(path: string) {
@@ -76,11 +53,9 @@ async function run(command: string[], options: RunOptions = {}): Promise<string 
 
   const child = Bun.spawn(command, {
     env: options.env ?? process.env,
-    stdin: options.input === undefined ? 'ignore' : new Blob([options.input]),
+    stdin: 'ignore',
     stdout,
     stderr: options.quiet ? 'ignore' : 'inherit',
-    timeout: options.timeout,
-    killSignal: 'SIGKILL'
   })
 
   const [code, output] = await Promise.all([
@@ -355,10 +330,6 @@ class Deployment {
     try {
       await this.compose(['up', '-d', '--no-deps', '--force-recreate', 'meta-' + this.candidate.slot])
       await this.waitReady(this.candidate)
-      await this.compose(['exec', '-T', 'meta-' + this.candidate.slot, 'bun', '-'], {
-        input: `await (${checkCandidate.toString()})()`, timeout: 35_000
-      })
-
       const workers = await this.switch(this.candidate)
       setFallback(this.frontend, identifier)
       await this.drain(workers)

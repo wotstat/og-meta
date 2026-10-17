@@ -1,4 +1,5 @@
 import type { Artifact, ImageFormat, PageMeta } from '../artifact'
+import { imageQuality, type ImageEncoding } from '../image'
 import { startRenderServer } from './server'
 
 type RendererPoolOptions = {
@@ -11,7 +12,7 @@ type RendererPoolOptions = {
   noSandbox?: boolean
 }
 
-type RenderRequest = { url: string, format: ImageFormat, meta: PageMeta }
+type RenderRequest = { url: string, format: ImageFormat, encoding: ImageEncoding, meta: PageMeta }
 
 export class RendererError extends Error {
   constructor(message: string, readonly status: 502 | 503 | 504, options?: ErrorOptions) {
@@ -102,7 +103,7 @@ export class RendererPool {
       const { width, height } = this.options.formats[job.request.format]
       await view.resize(width, height)
       await view.evaluate(`window.prepare(${JSON.stringify(job.request)})`)
-      return view.screenshot({ format: 'png' })
+      return view.screenshot({ format: job.request.encoding, quality: imageQuality })
     }).then(job.resolve, job.reject)
   }
 

@@ -8,6 +8,8 @@ services:
     environment:
       PUBLIC_ORIGIN: http://localhost:9110
       IMAGE_ORIGIN: http://localhost:9110
+      IMAGE_FORMAT: jpeg
+      IMAGE_QUALITY: '98'
       CHROME_NO_SANDBOX: 'true'
       CLICKHOUSE_PROXY_URL: https://wotstat.info/api/db/
       CLICKHOUSE_USER: public

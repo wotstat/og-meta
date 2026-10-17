@@ -1,7 +1,13 @@
 # analytics-frontend-meta
 
-Метатеги и PNG-превью для WotStat. Bun + Chromium в Docker.
+Метатеги и PNG/JPEG-превью для WotStat. Bun + Chromium в Docker.
 Пока включены только для `*/debug/*`.
+
+Оба endpoint доступны всегда: `/analytics/image.png` возвращает PNG,
+`/analytics/image.jpg` — JPEG. Метатеги HTML выбирают ссылку по `IMAGE_FORMAT`
+(`png` или `jpeg`, по умолчанию `jpeg`). `IMAGE_QUALITY` задаёт качество JPEG
+от 0 до 100, по умолчанию 98; для PNG игнорируется.
+В обоих Docker Compose сейчас заданы `IMAGE_FORMAT: jpeg` и `IMAGE_QUALITY: '98'`.
 
 ## Разработка
 
@@ -38,3 +44,5 @@ docker compose -p og-meta-dev -f docker-compose.dev.yaml restart og-meta
 
 Конфигурация Nginx и настройка ClickHouse — в [server-config](../server-config/README.md).
 При деплоях перезагружается только внутренний Nginx.
+Для перехода на JPEG нужно один раз применить обновлённый внешний конфиг
+`sites-available/og.wotstat.info`, пропускающий `/analytics/image.jpg`.

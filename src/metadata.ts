@@ -1,9 +1,8 @@
 import type { Artifact, PageMeta, ImageFormat } from './artifact'
+import { imageEncodings, preferredImageEncoding, type ImageEncoding } from './image'
 
-export const imagePath = '/analytics/image.png'
-
-export function imageUrl(page: URL, format: ImageFormat, version: string, origin: string, revisionKey?: string): string {
-  const url = new URL(imagePath, origin)
+export function imageUrl(page: URL, format: ImageFormat, encoding: ImageEncoding, version: string, origin: string, revisionKey?: string): string {
+  const url = new URL(imageEncodings[encoding].path, origin)
   url.searchParams.set('url', page.pathname + page.search)
   url.searchParams.set('format', format)
   url.searchParams.set('v', version)
@@ -31,11 +30,11 @@ export function renderHtml(artifact: Artifact, page: URL, meta: PageMeta, imageO
   }
 
   if (meta.hasImage) {
-    properties['og:image'] = imageUrl(page, 'og', version, imageOrigin, meta.revisionKey)
-    properties['og:image:type'] = 'image/png'
+    properties['og:image'] = imageUrl(page, 'og', preferredImageEncoding, version, imageOrigin, meta.revisionKey)
+    properties['og:image:type'] = imageEncodings[preferredImageEncoding].contentType
     properties['og:image:width'] = String(metadata.formats.og.width)
     properties['og:image:height'] = String(metadata.formats.og.height)
-    names['twitter:image'] = imageUrl(page, 'twitter', version, imageOrigin, meta.revisionKey)
+    names['twitter:image'] = imageUrl(page, 'twitter', preferredImageEncoding, version, imageOrigin, meta.revisionKey)
 
     if (meta.imageAlt !== undefined) {
       properties['og:image:alt'] = meta.imageAlt
