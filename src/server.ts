@@ -52,7 +52,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
   }
 
   async function image(request: Request, encoding: ImageEncoding) {
-    const params = new URL(request.url).searchParams
+    const params = parseUrl(request.url).searchParams
     const raw = params.get('url')
     const format = params.get('format') ?? 'og'
     if (!raw || (format !== 'og' && format !== 'twitter')) return failure('Invalid image parameters', 400)
@@ -105,10 +105,17 @@ function failure(message: string, status: number): Response {
   })
 }
 
+function parseUrl(value: string, base?: string): URL {
+  const url = new URL(value, base)
+  // Обход бага Telegram WebpageBot: URL из превью может содержать буквальное &amp;.
+  url.search = url.search.replaceAll('&amp;', '&')
+  return url
+}
+
 function pageUrl(value: string, publicOrigin: string): URL | null {
   if (value.length > 8192) return null
   try {
-    const page = new URL(value, publicOrigin)
+    const page = parseUrl(value, publicOrigin)
     if (page.origin !== publicOrigin || page.username || page.password) return null
     page.hash = ''
     return page
