@@ -16,7 +16,7 @@ x-meta: &meta
 x-environment: &environment
   PUBLIC_ORIGIN: https://wotstat.info
   IMAGE_ORIGIN: https://og.wotstat.info
-  IMAGE_FORMAT: jpeg
+  IMAGE_FORMAT: png
   IMAGE_QUALITY: '98'
   RENDER_POOL_SIZE: '4'
   RENDER_QUEUE_LIMIT: '20'
