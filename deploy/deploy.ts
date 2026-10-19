@@ -22,6 +22,7 @@ type RunOptions = {
   capture?: boolean
   check?: boolean
   quiet?: boolean
+  timeoutMs?: number
   env?: NodeJS.ProcessEnv
 }
 
@@ -56,6 +57,7 @@ async function run(command: string[], options: RunOptions = {}): Promise<string 
     stdin: 'ignore',
     stdout,
     stderr: options.quiet ? 'ignore' : 'inherit',
+    timeout: options.timeoutMs,
   })
 
   const [code, output] = await Promise.all([
@@ -116,24 +118,52 @@ class Deployment {
     return run(command, { ...options, env, capture: false })
   }
 
-  async waitReady(item: DeploymentPair) {
-    const container = await this.compose(['ps', '-a', '-q', 'meta-' + item.slot], { capture: true })
-    const initialRestarts = await run(['docker', 'inspect', '--format', '{{.RestartCount}}', container], { capture: true })
-    const script = 'const r = await fetch("http://127.0.0.1:3000/ready", {signal: AbortSignal.timeout(2000)}); '
-      + 'const h = await r.json(); process.exit(r.ok && h.deploymentId === process.env.DEPLOYMENT_ID ? 0 : 1)'
+  async logDiagnostics(item: DeploymentPair) {
+    const service = 'meta-' + item.slot
+    console.error(`Meta diagnostics for ${service} (release ${item.release}, deployment ${item.id})`)
 
-    const deadline = performance.now() + 120_000
-    while (performance.now() < deadline) {
-      if (await this.compose(['exec', '-T', 'meta-' + item.slot, 'bun', '-e', script], { check: false, quiet: true }) === 0) return
-
-      const [restarts, status] = (await run(['docker', 'inspect', '--format', '{{.RestartCount}} {{.State.Status}}', container], { capture: true })).split(/\s+/)
-      if (Number(restarts) > Number(initialRestarts) || ['exited', 'dead'].includes(status ?? '')) {
-        throw new Error('Meta exited or restarted before becoming ready')
+    try {
+      const options = { check: false, timeoutMs: 5000 }
+      const container = await this.compose(['ps', '-a', '-q', service], { ...options, capture: true })
+      if (!container) {
+        console.error(`No container found for ${service}`)
+        return
       }
-      await Bun.sleep(1000)
-    }
 
-    throw new Error('Candidate did not become ready within 120 seconds')
+      const format = 'status={{.State.Status}} exitCode={{.State.ExitCode}} oomKilled={{.State.OOMKilled}} '
+        + 'restarts={{.RestartCount}} error={{json .State.Error}} startedAt={{.State.StartedAt}} finishedAt={{.State.FinishedAt}}'
+      await run(['docker', 'inspect', '--format', format, container], options)
+
+      console.error(`Last 200 log lines for ${service}:`)
+      await run(['docker', 'logs', '--timestamps', '--tail', '200', container], options)
+    } catch (error) {
+      console.error(`Could not collect diagnostics for ${service}:`, error)
+    }
+  }
+
+  async waitReady(item: DeploymentPair) {
+    try {
+      const container = await this.compose(['ps', '-a', '-q', 'meta-' + item.slot], { capture: true })
+      const initialRestarts = await run(['docker', 'inspect', '--format', '{{.RestartCount}}', container], { capture: true })
+      const script = 'const r = await fetch("http://127.0.0.1:3000/ready", {signal: AbortSignal.timeout(2000)}); '
+        + 'const h = await r.json(); process.exit(r.ok && h.deploymentId === process.env.DEPLOYMENT_ID ? 0 : 1)'
+
+      const deadline = performance.now() + 120_000
+      while (performance.now() < deadline) {
+        if (await this.compose(['exec', '-T', 'meta-' + item.slot, 'bun', '-e', script], { check: false, quiet: true }) === 0) return
+
+        const [restarts, status] = (await run(['docker', 'inspect', '--format', '{{.RestartCount}} {{.State.Status}}', container], { capture: true })).split(/\s+/)
+        if (Number(restarts) > Number(initialRestarts) || ['exited', 'dead'].includes(status ?? '')) {
+          throw new Error('Meta exited or restarted before becoming ready')
+        }
+        await Bun.sleep(1000)
+      }
+
+      throw new Error('Candidate did not become ready within 120 seconds')
+    } catch (error) {
+      await this.logDiagnostics(item)
+      throw error
+    }
   }
 
   async gatewayWorkers() {
@@ -335,6 +365,7 @@ class Deployment {
       await this.drain(workers)
       if (active) await this.compose(['rm', '--stop', '--force', 'meta-' + active.slot])
     } catch (error) {
+      console.error('Activation failed; recovering the previous deployment:', error)
       // Failed recovery leaves the journal and all releases intact for the next run.
       await this.recover()
       throw error
@@ -419,6 +450,6 @@ async function main() {
 try {
   await main()
 } catch (error) {
-  console.error(`Deployment failed: ${error instanceof Error ? error.message : error}`)
+  console.error('Deployment failed:', error)
   process.exitCode = 1
 }
