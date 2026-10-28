@@ -92,6 +92,10 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
 function requestImageOrigin(request: Request): string {
   const origin = new URL(Bun.env.IMAGE_ORIGIN ?? 'https://og.wotstat.info')
   const host = request.headers.get('x-forwarded-host') ?? new URL(request.url).host
+  if (/^(?:[a-z0-9-]+\.)*mtstat\.info(?::\d+)?$/i.test(host)) {
+    origin.hostname = 'og.mtstat.info'
+    return origin.origin
+  }
   if (/^ru\.(?:[a-z0-9-]+\.)*wotstat\.info(?::\d+)?$/i.test(host) && !origin.hostname.startsWith('ru.')) {
     origin.hostname = `ru.${origin.hostname}`
   }
