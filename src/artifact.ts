@@ -5,6 +5,10 @@ import type { database } from './database'
 // Контракт собранного server.mjs; исходники и Vue-зависимости сайта здесь не нужны.
 export type ImageFormat = 'og' | 'twitter'
 
+export type RequestContext = {
+  url: string
+}
+
 export type PageMeta = {
   definitionId: string
   hasImage: boolean
@@ -16,7 +20,7 @@ export type PageMeta = {
 }
 
 export type MetaResolver = {
-  resolveMeta: (url: URL) => Promise<PageMeta>
+  resolveMeta: (url: URL, request: RequestContext) => Promise<PageMeta>
   warmup: () => Promise<void>
   close: () => void
 }

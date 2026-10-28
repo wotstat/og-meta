@@ -1,4 +1,4 @@
-import type { Artifact, MetaResolver } from './artifact'
+import type { Artifact, MetaResolver, RequestContext } from './artifact'
 import { imageEncodings, type ImageEncoding } from './image'
 import { imageUrl, renderHtml } from './metadata'
 import { RendererError, type RendererPool } from './renderer/RendererPool'
@@ -37,12 +37,13 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
   }
 
   async function html(request: Request) {
+    const context = createRequestContext(request)
     const url = new URL(request.url)
     const page = pageUrl(url.pathname + url.search, publicOrigin)
     if (!page) return failure('Invalid page URL', 400)
 
-    const meta = await resolver.resolveMeta(page)
-    return new Response(request.method === 'HEAD' ? null : renderHtml(artifact, page, meta, requestImageOrigin(request)), {
+    const meta = await resolver.resolveMeta(page, context)
+    return new Response(request.method === 'HEAD' ? null : renderHtml(artifact, page, meta, requestImageOrigin(context)), {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': `public, max-age=${Math.min(300, Math.max(0, meta.cache.htmlSeconds))}`,
@@ -52,6 +53,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
   }
 
   async function image(request: Request, encoding: ImageEncoding) {
+    const context = createRequestContext(request)
     const params = parseUrl(request.url).searchParams
     const raw = params.get('url')
     const format = params.get('format') ?? 'og'
@@ -65,13 +67,13 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
       return new Response(null, {
         status: 302,
         headers: {
-          Location: imageUrl(page, format, encoding, version, requestImageOrigin(request), params.get('r') ?? undefined),
+          Location: imageUrl(page, format, encoding, version, requestImageOrigin(context), params.get('r') ?? undefined),
           'Cache-Control': 'no-store'
         },
       })
     }
 
-    const meta = await resolver.resolveMeta(page)
+    const meta = await resolver.resolveMeta(page, context)
     if (!meta.hasImage) return failure('No image for this page', 404)
     const headers = {
       'Content-Type': imageEncodings[encoding].contentType,
@@ -80,7 +82,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
     if (request.method === 'HEAD') return new Response(null, { headers })
 
     try {
-      return new Response(await pool.render({ url: page.href, format, encoding, meta }), { headers })
+      return new Response(await pool.render({ url: page.href, format, encoding, meta, request: context }), { headers })
     } catch (error) {
       console.error('Meta image rendering failed:', error)
       const status = error instanceof RendererError ? error.status : 502
@@ -89,9 +91,17 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
   }
 }
 
-function requestImageOrigin(request: Request): string {
+function createRequestContext(request: Request): RequestContext {
+  const url = new URL(request.url)
+  const host = request.headers.get('x-forwarded-host') ?? url.host
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const protocol = forwardedProto === 'http' || forwardedProto === 'https' ? `${forwardedProto}:` : url.protocol
+  return { url: new URL(`${protocol}//${host}${url.pathname}${url.search}`).href }
+}
+
+function requestImageOrigin(request: RequestContext): string {
   const origin = new URL(Bun.env.IMAGE_ORIGIN ?? 'https://og.wotstat.info')
-  const host = request.headers.get('x-forwarded-host') ?? new URL(request.url).host
+  const host = new URL(request.url).host
   if (/^(?:[a-z0-9-]+\.)*mtstat\.info(?::\d+)?$/i.test(host)) {
     origin.hostname = 'og.mtstat.info'
     return origin.origin
