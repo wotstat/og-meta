@@ -5,6 +5,7 @@ import { RendererError, type RendererPool } from './renderer/RendererPool'
 
 export function startServer(artifact: Artifact, resolver: MetaResolver, pool: RendererPool, timeoutMs: number, isReady: () => boolean) {
   const publicOrigin = new URL(Bun.env.PUBLIC_ORIGIN ?? 'https://wotstat.info').origin
+  const imageOrigin = new URL(Bun.env.IMAGE_ORIGIN ?? 'https://og.wotstat.info').origin
   const { version } = artifact
 
   return Bun.serve({
@@ -43,7 +44,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
     if (!page) return failure('Invalid page URL', 400)
 
     const meta = await resolver.resolveMeta(page, context)
-    return new Response(request.method === 'HEAD' ? null : renderHtml(artifact, page, meta, requestImageOrigin(context)), {
+    return new Response(request.method === 'HEAD' ? null : renderHtml(artifact, page, meta, imageOrigin), {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': `public, max-age=${Math.min(300, Math.max(0, meta.cache.htmlSeconds))}`,
@@ -67,7 +68,7 @@ export function startServer(artifact: Artifact, resolver: MetaResolver, pool: Re
       return new Response(null, {
         status: 302,
         headers: {
-          Location: imageUrl(page, format, encoding, version, requestImageOrigin(context), params.get('r') ?? undefined),
+          Location: imageUrl(page, format, encoding, version, imageOrigin, params.get('r') ?? undefined),
           'Cache-Control': 'no-store'
         },
       })
@@ -97,19 +98,6 @@ function createRequestContext(request: Request): RequestContext {
   const forwardedProto = request.headers.get('x-forwarded-proto')
   const protocol = forwardedProto === 'http' || forwardedProto === 'https' ? `${forwardedProto}:` : url.protocol
   return { url: new URL(`${protocol}//${host}${url.pathname}${url.search}`).href }
-}
-
-function requestImageOrigin(request: RequestContext): string {
-  const origin = new URL(Bun.env.IMAGE_ORIGIN ?? 'https://og.wotstat.info')
-  const host = new URL(request.url).host
-  if (/^(?:[a-z0-9-]+\.)*mtstat\.info(?::\d+)?$/i.test(host)) {
-    origin.hostname = 'og.mtstat.info'
-    return origin.origin
-  }
-  if (/^ru\.(?:[a-z0-9-]+\.)*wotstat\.info(?::\d+)?$/i.test(host) && !origin.hostname.startsWith('ru.')) {
-    origin.hostname = `ru.${origin.hostname}`
-  }
-  return origin.origin
 }
 
 function failure(message: string, status: number): Response {
